@@ -30,9 +30,11 @@ from ultralytics import YOLO
 import config.settings as cfg
 from core.device import pick_torch_device
 
-# Optional emotion detection
 try:
-    from fer import FER
+    try:
+        from fer import FER
+    except ImportError:
+        from fer.fer import FER
 except ImportError:
     FER = None
 
@@ -73,8 +75,7 @@ class FaceRecognizer:
         if FER is not None:
             try:
                 self.emotion_detector = FER(
-                    emotion_model_path=None,  # Use default model
-                    cascaded_models=True,
+                    mtcnn=False,
                 )
                 print("[FaceRecognizer] Emotion detector (FER) loaded ✓")
             except Exception as e:
