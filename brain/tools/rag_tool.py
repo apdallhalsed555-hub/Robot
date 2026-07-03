@@ -61,7 +61,8 @@ class RAGTool:
                 verified_results.append(result)
         
         if not verified_results:
-            return "No directly matching memories found."
+            # Fallback to returning all retrieved semantic results if keyword filter is too strict
+            return "\n".join(results)
         
         return "\n".join(verified_results)
 
