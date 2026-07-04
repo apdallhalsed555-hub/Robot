@@ -31,20 +31,39 @@ def _open_video_capture(index: int) -> cv2.VideoCapture:
     """Open a camera; on Windows the default MSMF stack often leaves the LED off until DShow is used."""
     b = cfg.CAMERA_BACKEND
     if sys.platform != "win32" or b in ("", "default"):
-        return cv2.VideoCapture(index)
+        try:
+            return cv2.VideoCapture(index)
+        except Exception:
+            pass
     if b == "dshow":
-        return cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        try:
+            return cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        except Exception:
+            pass
     if b == "msmf":
-        return cv2.VideoCapture(index, cv2.CAP_MSMF)
+        try:
+            return cv2.VideoCapture(index, cv2.CAP_MSMF)
+        except Exception:
+            pass
     # auto
-    cap_ds = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    if cap_ds.isOpened():
-        print("[VisionPipeline] Camera backend: DirectShow (CAMERA_BACKEND=auto)")
-        return cap_ds
-    cap_ds.release()
-    cap = cv2.VideoCapture(index)
-    if cap.isOpened():
-        print("[VisionPipeline] Camera backend: default (DirectShow did not open this index)")
+    try:
+        cap_ds = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap_ds.isOpened():
+            print("[VisionPipeline] Camera backend: DirectShow (CAMERA_BACKEND=auto)")
+            return cap_ds
+        cap_ds.release()
+    except Exception as e:
+        print(f"[VisionPipeline] DirectShow failed, falling back: {e}")
+        
+    try:
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            print("[VisionPipeline] Camera backend: default (DirectShow did not open this index)")
+        return cap
+    except Exception:
+        pass
+        
+    return cv2.VideoCapture(index)
     return cap
 
 
