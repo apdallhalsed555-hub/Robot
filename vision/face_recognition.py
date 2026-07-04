@@ -161,7 +161,15 @@ class FaceRecognizer:
         face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
         aligned = self.mtcnn(face_rgb)
         if aligned is None:
-            return None
+            try:
+                # Fallback: Resize YOLO-cropped face to 160x160 and normalize manually (MTCNN range)
+                face_resized = cv2.resize(face_rgb, (160, 160))
+                face_tensor = torch.tensor(face_resized, dtype=torch.float32, device=self.device).permute(2, 0, 1)
+                face_tensor = (face_tensor - 127.5) / 128.0
+                aligned = face_tensor
+            except Exception as e:
+                print(f"[FaceRecognizer] Fallback alignment failed: {e}")
+                return None
 
         aligned = aligned.unsqueeze(0).to(self.device)
         with torch.no_grad():

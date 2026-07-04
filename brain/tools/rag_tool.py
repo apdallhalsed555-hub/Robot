@@ -40,7 +40,28 @@ class RAGTool:
         Search the user's long-term memory.
         Verify retrieved results contain matching keywords to prevent hallucination.
         """
-        user_id = self.session.current_user_id
+        user_id = self.session.current_user_id if self.session else None
+        if not user_id:
+            try:
+                from database.mongo_manager import MongoManager
+                mongo = MongoManager()
+                users = mongo.find_all("users")
+                mongo.close()
+                if len(users) == 1:
+                    user_id = users[0]["_id"]
+                    if self.session:
+                        self.session.current_user_id = user_id
+                        self.session.cached_user_info = users[0]
+                elif len(users) > 1:
+                    mohamed_user = next((u for u in users if u.get("name", "").lower() == "mohamed"), None)
+                    if mohamed_user:
+                        user_id = mohamed_user["_id"]
+                        if self.session:
+                            self.session.current_user_id = user_id
+                            self.session.cached_user_info = mohamed_user
+            except Exception as e:
+                print(f"[RAGTool] Fallback user resolution failed: {e}")
+                
         if not user_id:
             return "Error: No user currently recognized."
 
