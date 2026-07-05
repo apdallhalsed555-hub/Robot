@@ -69,8 +69,8 @@ def extract_profile_facts(text: str) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
 
     for pat in _NAME_PATTERNS:
-        m = pat.search(t_clean)
-        if m:
+        matches = pat.finditer(t_clean)
+        for m in matches:
             name = _normalize_name(m.group(1))
             if name.lower() not in (
                 "a", "the", "and", "yes", "no", "hi", "hey", "hello",
@@ -83,6 +83,8 @@ def extract_profile_facts(text: str) -> Dict[str, Any]:
             ):
                 out["name"] = name
                 break
+        if "name" in out:
+            break
 
     for pat in _AGE_PATTERNS:
         m = pat.search(t_clean)
