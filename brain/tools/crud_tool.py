@@ -185,7 +185,8 @@ class CRUDTool:
                 bio = self.session.get_biometric_capture() if self.session else {}
                 face_emb = bio.get("face_embedding") or self.vision.get_current_speaker_embedding()
         else:
-            return "SYSTEM: Vision not available — cannot capture face."
+            bio = self.session.get_biometric_capture() if self.session else {}
+            face_emb = bio.get("face_embedding")
 
         # Get voice embedding from the current speech turn
         voice_emb = getattr(self.session, "last_voice_embedding", None)
