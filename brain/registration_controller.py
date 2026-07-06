@@ -66,8 +66,28 @@ def process_registration_turn(
     has_voice_embedding: bool,
 ) -> RegistrationTurnResult:
     facts = extract_profile_facts(text)
-    stage_msg = None
+    # Check if a name is provided and matches an existing registered user
+    name_fact = facts.get("name")
+    if name_fact:
+        try:
+            existing_user = crud.memory.mongo.get_user_by_name(name_fact)
+            if existing_user:
+                user_id = str(existing_user["_id"])
+                session.current_user_id = user_id
+                session.cached_user_info = existing_user
+                session.session_owner_id = user_id
+                session.clear_pending_registration()
+                session.confirm_prompt_sent = False
+                print(f"[RegistrationController] Logged in existing user by name: {name_fact} ({user_id})")
+                return RegistrationTurnResult(
+                    facts_extracted=facts,
+                    display_name=name_fact,
+                    skip_llm=False,
+                )
+        except Exception as e:
+            print(f"[RegistrationController] Error checking existing user by name: {e}")
 
+    stage_msg = None
     if facts and not is_confirmation(text):
         stage_msg = crud.stage_user_profile(json.dumps(facts))
 
