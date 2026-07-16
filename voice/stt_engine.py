@@ -99,7 +99,9 @@ class HearingEngine:
     def _compose_initial_prompt(self) -> str:
         """Biases recognition toward names and domain terms without hard-coding the full lexicon."""
         chunks = [
-            "Mahmoud, Abdullah, Ola, Egypt, Musa, Robot, AI, Hello, Hi, My name is",
+            "Mahmoud, Mohamed, Ahmed, Ali, Omar, Amr, Tarek, Khaled, Hassan, Hussein, Youssef, Mostafa, Ibrahim, Kareem, Tamer, Wael, Yasser, Hesham, Ayman, Magdy, Ramy, Samy, Hany, Ashraf, Nabil, Sherif, Walid, Essam, Adel, Osama, Ehab, Hazem, Hisham, Hamdy, Abdel fatah, Abdullah, Musa, Heba, Dina, Ghada, Ola, Mona, Rania, Marwa, Yasmine, Noha, Mai, Shaimaa, Salma, Sarah, Nour, Mariam, Farida, Aya, "
+            "Sayed, Saeed, Saad, Shawky, Fathy, Taha, Mamdouh, Galal, Gamal, Kamal, Ezzat, Emad, Bahaa, Wafik, Ziad, Seif, Yasin, Yahia, Adam, Fares, Mazen, Maged, Alaa, Medhat, Raouf, Reem, Nada, Nermine, Shirin, Dalia, Yasmin, Asmaa, Esraa, Eman, Amira, Hanan, Sahar, Mervat, Nagwa, Wafaa, Manal, Amal, Samia, Sohair, Fatma, Zainab, Khadija, "
+            "Egypt, Cairo, Alexandria, Giza, Aswan, Luxor, Habibi, Yalla, Inshallah, Mashallah, Shukran, Khalas, Wallahi, Yani, Ahlan, Aywa, Tamam, Mashy, Koshary, Falafel, Shawarma, Basbousa, Kunafa, Ahwa, Shai, Robot, AI, Hello, Hi, My name is",
         ]
         vf = getattr(cfg, "WHISPER_VOCAB_FILE", "") or ""
         if vf.strip() and os.path.isfile(vf.strip()):
