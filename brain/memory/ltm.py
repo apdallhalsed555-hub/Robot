@@ -13,8 +13,9 @@ import config.settings as cfg
 from database.qdrant_manager import QdrantManager
 
 class LongTermMemory:
-    def __init__(self, qdrant_manager: QdrantManager):
+    def __init__(self, qdrant_manager: QdrantManager, ui_callback=None):
         self.qdrant = qdrant_manager
+        self.ui_callback = ui_callback
         
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -30,6 +31,8 @@ class LongTermMemory:
         }
         pid = self.qdrant.store_memory(embedding, text, user_id=user_id, metadata=metadata)
         print(f"[LTM] Stored memory (user_id={user_id}): {text}")
+        if self.ui_callback:
+            self.ui_callback("LTM Store", f"Stored: {text[:100]}")
         return pid
 
     def retrieve(
@@ -80,6 +83,9 @@ class LongTermMemory:
             memories.append(
                 f"[ID: {mem_id}] [{payload.get('timestamp')}] {payload.get('text')}"
             )
+
+        if memories and self.ui_callback:
+            self.ui_callback("LTM Retrieve", f"Retrieved {len(memories)} memories")
 
         return memories
 

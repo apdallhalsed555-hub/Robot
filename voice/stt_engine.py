@@ -132,12 +132,16 @@ class HearingEngine:
                 self.stream.close()
             except:
                 pass
-        self.audio.terminate()
+        self.stream = None
 
 
     def _listen_loop(self):
         """Captures raw audio from mic."""
         try:
+            # Re-init audio if it was terminated or failed previously
+            if self.audio is None:
+                self.audio = pyaudio.PyAudio()
+                
             self.stream = self.audio.open(
                 format=pyaudio.paInt16,
                 channels=1,

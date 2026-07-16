@@ -56,6 +56,11 @@ class RotatorChatModel:
             try:
                 return self.current.invoke(*args, **kwargs)
             except Exception as exc:
+                exc_str = str(exc).lower()
+                if "400" in exc_str and ("tool_use_failed" in exc_str or "invalid_request_error" in exc_str):
+                    raise
+
+                print(f"[Debug] exc={exc}, current_index={self.current_index}, i={i}, attempts={attempts}, len(keys)={len(self.keys)}")
                 if len(self.keys) > 1 and i < attempts - 1:
                     print(
                         f"{Fore.YELLOW}[Brain] Groq call failed on key index {self.current_index}. "

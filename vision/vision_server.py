@@ -7,6 +7,7 @@ from fastapi import FastAPI, Response, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import os
+import config.settings as cfg
 
 from core.json_util import sanitize_for_api
 from vision.vision_pipeline import VisionPipeline
@@ -88,8 +89,20 @@ class VisionServer:
         self.ui_state = ui_state or {
             "conversation_history": [],
             "system_status": "Starting...",
+            "thought_log": [],
+            "action_log": [],
+            "is_running": True
         }
+        if "thought_log" not in self.ui_state:
+            self.ui_state["thought_log"] = []
+        if "action_log" not in self.ui_state:
+            self.ui_state["action_log"] = []
+        if "is_running" not in self.ui_state:
+            self.ui_state["is_running"] = True
+            
         self.thread: Optional[threading.Thread] = None
+        self.tts = None
+        self.stt = None
 
         @app.get("/session_status")
         async def get_session_status():
@@ -101,10 +114,100 @@ class VisionServer:
                 users = vision_pipeline_instance.db.list_users()
                 return {
                     "users": [
-                        {"id": str(u["_id"]), "name": u["name"]} for u in users
+                        {"id": str(u["_id"]), "name": u["name"], **{k:v for k,v in u.items() if k not in ["_id", "name"]}} for u in users
                     ]
                 }
             return {"users": []}
+
+        @app.post("/api/users")
+        async def add_user(request: Request):
+            data = await request.json()
+            if not data.get("name"):
+                return {"success": False, "error": "Name is required"}
+            if vision_pipeline_instance:
+                try:
+                    uid = vision_pipeline_instance.db.mongo.store_user(data)
+                    return {"success": True, "id": str(uid)}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Vision pipeline not initialized"}
+
+        @app.delete("/api/users/{user_id}")
+        async def delete_user(user_id: str):
+            if vision_pipeline_instance:
+                try:
+                    ok = vision_pipeline_instance.db.delete_user(user_id)
+                    return {"success": ok}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Vision pipeline not initialized"}
+
+        @app.post("/api/database/erase")
+        async def erase_database():
+            if vision_pipeline_instance:
+                try:
+                    vision_pipeline_instance.db.mongo.delete_many("users", {})
+                    for col in [cfg.COLLECTION_IDENTITY, cfg.COLLECTION_VOICE, cfg.COLLECTION_LTM]:
+                        vision_pipeline_instance.db.qdrant.client.delete_collection(col)
+                    vision_pipeline_instance.db.qdrant._init_collections()
+                    return {"success": True}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Vision pipeline not initialized"}
+
+        @app.get("/api/power")
+        async def get_power():
+            return {"is_running": self.ui_state.get("is_running", True)}
+
+        @app.post("/api/power")
+        async def toggle_power():
+            is_running = self.ui_state.get("is_running", True)
+            if is_running:
+                if self.stt:
+                    self.stt.stop()
+                if vision_pipeline_instance:
+                    vision_pipeline_instance.stop()
+                self.ui_state["is_running"] = False
+                self.ui_state["system_status"] = "Paused"
+            else:
+                if self.stt:
+                    self.stt.start()
+                if vision_pipeline_instance:
+                    vision_pipeline_instance.start()
+                self.ui_state["is_running"] = True
+                self.ui_state["system_status"] = "Active"
+            return {"success": True, "is_running": self.ui_state["is_running"]}
+
+        @app.get("/api/thought_process")
+        async def get_thought_process():
+            return {"thought_log": sanitize_for_api(self.ui_state.get("thought_log", []))}
+
+        @app.get("/api/action_log")
+        async def get_action_log():
+            return {"action_log": sanitize_for_api(self.ui_state.get("action_log", []))}
+
+        @app.get("/api/system_status")
+        async def get_sys_status():
+            try:
+                import psutil
+                import shutil
+                import torch
+                cpu = psutil.cpu_percent()
+                mem = psutil.virtual_memory().percent
+                total, used, free = shutil.disk_usage("/")
+                disk = (used / total) * 100
+                gpu = 0.0
+                if torch.cuda.is_available():
+                    try:
+                        gpu = torch.cuda.utilization()
+                    except:
+                        try:
+                            gpu = (torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_memory) * 100
+                        except:
+                            pass
+                return {"cpu": cpu, "ram": mem, "disk": disk, "gpu": gpu}
+            except Exception:
+                return {"cpu": 0, "ram": 0, "disk": 0, "gpu": 0}
 
         @app.post("/api/assign_voice")
         async def assign_voice(request: Request):
@@ -127,6 +230,10 @@ class VisionServer:
                 return {"success": True}
 
             return {"success": False, "error": "Failed to assign voice"}
+
+    def set_engines(self, tts, stt):
+        self.tts = tts
+        self.stt = stt
 
     def start(self):
         self.thread = threading.Thread(

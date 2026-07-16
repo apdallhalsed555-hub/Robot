@@ -58,14 +58,28 @@ class OCRTool:
         thresh = float(getattr(cfg, "OCR_MIN_CONFIDENCE", 0.35))
         aggregated: list[tuple[float, str]] = []
 
+        import cv2
         # Try centre crop first, fall back to full frame
         for label, crop in (
             ("center", self._center_roi(self.latest_frame)),
             ("full", self.latest_frame),
         ):
             try:
+                # Pre-process image to help with bad webcams
+                gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                enhanced = clahe.apply(gray)
+
                 # EasyOCR returns [(bbox, text, confidence), ...]
-                results = self.reader.readtext(crop)
+                results = self.reader.readtext(
+                    enhanced,
+                    mag_ratio=2.5,          # Magnify image for smaller text
+                    contrast_ths=0.05,      # More aggressive contrast threshold
+                    adjust_contrast=0.7,    # Boost contrast internally
+                    text_threshold=0.6,     # Accept lower confidence chunks
+                    width_ths=0.7           # Better horizontal merging
+                )
             except Exception as e:
                 return f"OCR read failed ({label}): {e}"
 

@@ -10,10 +10,11 @@ from typing import List, Dict, Optional
 import config.settings as cfg
 
 class ShortTermMemory:
-    def __init__(self, brain_engine):
+    def __init__(self, brain_engine, ui_callback=None):
         self.messages: List[Dict[str, str]] = []  # [{role, content}, ...]
         self.brain_engine = brain_engine
         self.summary = ""
+        self.ui_callback = ui_callback
 
     def add_message(self, user_text: str, robot_text: str):
         """Add a user/robot exchange. Summarize if buffer is full."""
@@ -66,6 +67,9 @@ class ShortTermMemory:
             self.summary = response.content.strip()
             # Keep only the last 2 exchanges (4 messages) for continuity
             self.messages = self.messages[-4:]
+            print(f"[STM] Summarization complete.")
+            if self.ui_callback:
+                self.ui_callback("STM Summarize", f"Rolling summary: {self.summary[:150]}...")
         except Exception as e:
             print(f"[STM] Summarization failed: {e}")
             # Fallback: just trim without summarizing

@@ -1,1 +1,5 @@
+<<<<<<< HEAD
+{"clocks":[{"peer_id":7102174469403255,"clock_id":0,"current_tick":2,"token":17997138322305729351}]}
+=======
 {"clocks":[{"peer_id":7102174469403255,"clock_id":0,"current_tick":43,"token":595633684589793531}]}
+>>>>>>> 8ea0bad02f5acfbcfb2e67850152774c1fa455ec

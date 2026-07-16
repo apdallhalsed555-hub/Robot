@@ -14,7 +14,12 @@ from typing import Generator, Iterator, Optional
 
 import sounddevice as sd
 from colorama import Fore, Style, init
-from kokoro import KPipeline
+try:
+    from kokoro import KPipeline
+    KOKORO_AVAILABLE = True
+except ImportError:
+    KPipeline = None
+    KOKORO_AVAILABLE = False
 
 init(autoreset=True)
 
@@ -55,7 +60,12 @@ class VoiceEngine:
         from core.device import pick_torch_device
 
         device = pick_torch_device()
-        self.pipeline = KPipeline(lang_code="a", device=device)
+        if KOKORO_AVAILABLE:
+            self.pipeline = KPipeline(lang_code="a", device=device)
+        else:
+            self.pipeline = None
+            print(f"{Fore.YELLOW}[TTS] Kokoro module not found. Running in MOCK mode (text only).{Style.RESET_ALL}")
+            
         self.voice = voice
         self.speed = speed
 
@@ -138,6 +148,11 @@ class VoiceEngine:
     def _play_text(self, text: str):
         if not text.strip() or self.stop_event.is_set():
             return
+        if not self.pipeline:
+            # Mock mode
+            time.sleep(len(text) * 0.05)
+            return
+            
         try:
             gen = self.pipeline(
                 text,

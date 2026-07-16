@@ -46,7 +46,10 @@ if (-not (Test-PortOpen -Port 27017)) {
     Write-Host "[run] WARN: mongod does not appear to be listening on 27017. Set MONGO_URI in .env or start MongoDB." -ForegroundColor Yellow
 }
 
-$py = "X:\Work\MiniConda\envs\tts\python.exe"
+$py = Join-Path $Root ".venv\Scripts\python.exe"
+if (-not (Test-Path $py)) {
+    $py = "X:\Work\MiniConda\envs\tts\python.exe"
+}
 if (-not (Test-Path $py)) {
     $py = Join-Path $Root "venv311\Scripts\python.exe"
 }

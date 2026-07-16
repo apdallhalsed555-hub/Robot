@@ -6,6 +6,10 @@ AI Robot System Orchestrator.
 import json
 import time
 import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import signal
 import sys
 import uuid
@@ -29,6 +33,8 @@ from brain.tools.web_search_tool import search_web
 from brain.tools.rag_tool import RAGTool
 from brain.tools.crud_tool import CRUDTool
 from brain.tools.stm_tool import STMTool
+from brain.tools.system_tool import SystemTool
+from brain.tools.vision_objects_tool import VisionObjectsTool
 from brain.locale import overlap_interrupt_message
 from brain.registration_controller import (
     process_registration_turn,
@@ -128,6 +134,31 @@ def push_ui_dialogue(role: str, text: str):
         UI_STATE["conversation_history"].pop(0)
     UI_STATE["last_update"] = time.time()
 
+def push_ui_thought(tool_name: str):
+    """Push a thought/tool call to the UI."""
+    if "thought_log" not in UI_STATE:
+        UI_STATE["thought_log"] = []
+    UI_STATE["thought_log"].append({
+        "tool": tool_name,
+        "timestamp": time.time()
+    })
+    if len(UI_STATE["thought_log"]) > 15:
+        UI_STATE["thought_log"].pop(0)
+    UI_STATE["last_update"] = time.time()
+
+def push_ui_action(component: str, text: str):
+    """Push an internal system action to the UI."""
+    if "action_log" not in UI_STATE:
+        UI_STATE["action_log"] = []
+    UI_STATE["action_log"].append({
+        "component": component,
+        "text": text,
+        "timestamp": time.time()
+    })
+    if len(UI_STATE["action_log"]) > 30:
+        UI_STATE["action_log"].pop(0)
+    UI_STATE["last_update"] = time.time()
+
 
 def _vision_stm_user_line(event: VisionChangeEvent) -> str:
     """Synthetic STM user slot for proactive vision (no microphone turn)."""
@@ -211,7 +242,7 @@ def main():
     viz_server.start()
 
     # 4. Init LTM (لا تحتاج brain)
-    ltm = LongTermMemory(db.qdrant)
+    ltm = LongTermMemory(db.qdrant, ui_callback=push_ui_action)
 
     # 5. Init Tool Registry وسجل الـ tools اللي مش محتاجة session أو stm
     registry = ToolRegistry()
@@ -232,7 +263,7 @@ def main():
     brain = BrainEngine(cfg, registry)
 
     # 7. Init STM بعد الـ brain (محتاجه للـ summarization)
-    stm = ShortTermMemory(brain)
+    stm = ShortTermMemory(brain, ui_callback=push_ui_action)
 
     # 8. Init Session بعد الـ stm
     session = SessionManager(stm, ltm)
@@ -404,8 +435,26 @@ def main():
         },
     )
 
+    system_tool = SystemTool(ui_state=UI_STATE)
+    registry.register(
+        "get_system_status",
+        "Check and report the robot's system health (CPU, RAM, disk usage, uptime, OS).",
+        system_tool.get_system_status,
+        {"type": "object", "properties": {}},
+    )
+
+    vision_tool = VisionObjectsTool(vision_pipeline=vision)
+    registry.register(
+        "detect_visible_objects",
+        "Query the camera to see what objects are currently visible in the robot's field of view.",
+        vision_tool.detect_visible_objects,
+        {"type": "object", "properties": {}},
+    )
+
     # 10. Init STT بعد ما كل حاجة جاهزة
     stt = HearingEngine(event_queue, tts, speech_activity=speech_activity)
+    
+    viz_server.set_engines(tts, stt)
 
     # 11. Start Threads
     vision.start()
@@ -612,6 +661,8 @@ def main():
 
                 # Filler phrase callback
                 def on_tool(tool_name: str):
+                    push_ui_thought(tool_name)
+                    push_ui_action("Tool Executed", f"{tool_name}")
                     if tool_name == "search_web":
                         tts.say("hold on, let me look that up real quick.")
                     elif tool_name == "search_memory":
